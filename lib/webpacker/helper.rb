@@ -17,9 +17,10 @@ module Webpacker::Helper
   #
   #   # When extract_css is true in webpacker.yml or the file is not a css:
   #   <%= asset_pack_path 'calendar.css' %> # => "/packs/calendar-1016838bab065ae1e122.css"
-  def asset_pack_path(name, **options)
-    if current_webpacker_instance.config.extract_css? || !stylesheet?(name)
-      path_to_asset(current_webpacker_instance.manifest.lookup!(name), options)
+  def asset_pack_path(name, webpacker: nil, **options)
+    instance = webpacker_instance(webpacker)
+    if instance.config.extract_css? || !stylesheet?(name)
+      path_to_asset(instance.manifest.lookup!(name), options)
     end
   end
 
@@ -34,9 +35,10 @@ module Webpacker::Helper
   #
   #   # When extract_css is true in webpacker.yml or the file is not a css:
   #   <%= asset_pack_url 'calendar.css' %> # => "http://example.com/packs/calendar-1016838bab065ae1e122.css"
-  def asset_pack_url(name, **options)
-    if current_webpacker_instance.config.extract_css? || !stylesheet?(name)
-      url_to_asset(current_webpacker_instance.manifest.lookup!(name), options)
+  def asset_pack_url(name, webpacker: nil, **options)
+    instance = webpacker_instance(webpacker)
+    if instance.config.extract_css? || !stylesheet?(name)
+      url_to_asset(instance.manifest.lookup!(name), options)
     end
   end
 
@@ -77,8 +79,8 @@ module Webpacker::Helper
   #
   #   <%= javascript_pack_tag 'calendar', 'data-turbolinks-track': 'reload' %> # =>
   #   <script src="/packs/calendar-1016838bab065ae1e314.js" data-turbolinks-track="reload"></script>
-  def javascript_pack_tag(*names, **options)
-    javascript_include_tag(*sources_from_manifest_entries(names, type: :javascript), **options)
+  def javascript_pack_tag(*names, webpacker: nil, **options)
+    javascript_include_tag(*sources_from_manifest_entries(names, type: :javascript, webpacker: webpacker), **options)
   end
 
   # Creates script tags that reference the js chunks from entrypoints when using split chunks API,
@@ -104,8 +106,8 @@ module Webpacker::Helper
   #
   #   <%= javascript_packs_with_chunks_tag 'calendar' %>
   #   <%= javascript_packs_with_chunks_tag 'map' %>
-  def javascript_packs_with_chunks_tag(*names, **options)
-    javascript_include_tag(*sources_from_manifest_entrypoints(names, type: :javascript), **options)
+  def javascript_packs_with_chunks_tag(*names, webpacker: nil, **options)
+    javascript_include_tag(*sources_from_manifest_entrypoints(names, type: :javascript, webpacker: webpacker), **options)
   end
 
   # Creates a link tag, for preloading, that references a given Webpacker asset.
@@ -116,9 +118,9 @@ module Webpacker::Helper
   #
   #   <%= preload_pack_asset 'fonts/fa-regular-400.woff2' %> # =>
   #   <link rel="preload" href="/packs/fonts/fa-regular-400-944fb546bd7018b07190a32244f67dc9.woff2" as="font" type="font/woff2" crossorigin="anonymous">
-  def preload_pack_asset(name, **options)
+  def preload_pack_asset(name, webpacker: nil, **options)
     if self.class.method_defined?(:preload_link_tag)
-      preload_link_tag(current_webpacker_instance.manifest.lookup!(name), options)
+      preload_link_tag(webpacker_instance(webpacker).manifest.lookup!(name), options)
     else
       raise "You need Rails >= 5.2 to use this tag."
     end
@@ -140,9 +142,9 @@ module Webpacker::Helper
   #   # When extract_css is true in webpacker.yml:
   #   <%= stylesheet_pack_tag 'calendar', 'data-turbolinks-track': 'reload' %> # =>
   #   <link rel="stylesheet" media="screen" href="/packs/calendar-1016838bab065ae1e122.css" data-turbolinks-track="reload" />
-  def stylesheet_pack_tag(*names, **options)
-    if current_webpacker_instance.config.extract_css?
-      stylesheet_link_tag(*sources_from_manifest_entries(names, type: :stylesheet), **options)
+  def stylesheet_pack_tag(*names, webpacker: nil, **options)
+    if webpacker_instance(webpacker).config.extract_css?
+      stylesheet_link_tag(*sources_from_manifest_entries(names, type: :stylesheet, webpacker: webpacker), **options)
     end
   end
 
@@ -167,9 +169,9 @@ module Webpacker::Helper
   #
   #   <%= stylesheet_packs_with_chunks_tag 'calendar' %>
   #   <%= stylesheet_packs_with_chunks_tag 'map' %>
-  def stylesheet_packs_with_chunks_tag(*names, **options)
-    if current_webpacker_instance.config.extract_css?
-      stylesheet_link_tag(*sources_from_manifest_entrypoints(names, type: :stylesheet), **options)
+  def stylesheet_packs_with_chunks_tag(*names, webpacker: nil, **options)
+    if webpacker_instance(webpacker).config.extract_css?
+      stylesheet_link_tag(*sources_from_manifest_entrypoints(names, type: :stylesheet, webpacker: webpacker), **options)
     end
   end
 
@@ -178,18 +180,23 @@ module Webpacker::Helper
       File.extname(name) == ".css"
     end
 
-    def sources_from_manifest_entries(names, type:)
-      names.map { |name| current_webpacker_instance.manifest.lookup!(name, type: type) }.flatten
+    def sources_from_manifest_entries(names, type:, webpacker: nil)
+      names.map { |name| webpacker_instance(webpacker).manifest.lookup!(name, type: type) }.flatten
     end
 
-    def sources_from_manifest_entrypoints(names, type:)
-      names.map { |name| current_webpacker_instance.manifest.lookup_pack_with_chunks!(name, type: type) }.flatten.uniq
+    def sources_from_manifest_entrypoints(names, type:, webpacker: nil)
+      names.map { |name| webpacker_instance(webpacker).manifest.lookup_pack_with_chunks!(name, type: type) }.flatten.uniq
     end
 
-    def resolve_path_to_image(name)
+    def resolve_path_to_image(name, webpacker: nil)
+      webpacker = webpacker_instance(webpacker)
       path = name.starts_with?("media/images/") ? name : "media/images/#{name}"
-      path_to_asset(current_webpacker_instance.manifest.lookup!(path))
+      path_to_asset(webpacker.manifest.lookup!(path))
     rescue
-      path_to_asset(current_webpacker_instance.manifest.lookup!(name))
+      path_to_asset(webpacker.manifest.lookup!(name))
+    end
+
+    def webpacker_instance(webpacker)
+      webpacker || current_webpacker_instance
     end
 end
